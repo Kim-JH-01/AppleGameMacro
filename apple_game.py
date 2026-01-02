@@ -119,43 +119,67 @@ class OneShotVision:
 class AppleBrain:
     def solve_simulation(self, initial_grid):
         print("🧠 [시뮬레이션] 전체 경로 미리 계산 중...")
-        virtual_board = copy.deepcopy(initial_grid)
-        num_map = [[(cell['num'] if cell != 0 else 0) for cell in row] for row in virtual_board]
+        # 숫자 행렬 생성
+        num_map = np.array([[(cell['num'] if cell != 0 else 0) for cell in row] for row in initial_grid])
         total_moves = []
         
-        while True:
-            found_in_this_pass = False
-            moves_in_this_pass = []
-            
-            for r1 in range(ROWS):
-                for c1 in range(COLS):
-                    if num_map[r1][c1] == 0: continue
-                    for r2 in range(r1, ROWS):
-                        for c2 in range(c1, COLS):
-                            if r1 == r2 and c1 == c2: continue
-                            if num_map[r2][c2] == 0: continue
+        H, W = num_map.shape
+        
+        r = 0
+        while r < H:
+            c = 0
+            while c < W:
+                found = False
+
+                # (r,c)를 좌상단으로 하는 모든 직사각형 탐색
+                for rr in range(r, H):
+                    for cc in range(c, W):
+                        rect = num_map[r:rr+1, c:cc+1]
+                        rect_sum = int(rect.sum())
+
+                        if rect_sum == 10:
+                            # 드래그 좌표 계산 (좌상단 -> 우하단)
+                            # 좌상단 셀과 우하단 셀의 좌표 찾기
+                            start_cell = initial_grid[r][c]
+                            end_cell = initial_grid[rr][cc]
                             
-                            current_sum = 0
-                            temp_coords = [] 
-                            for i in range(r1, r2+1):
-                                for j in range(c1, c2+1):
-                                    val = num_map[i][j]
-                                    current_sum += val
-                                    if val > 0: temp_coords.append((i, j))
-                                if current_sum > 10: break
-                            
-                            if current_sum == 10:
-                                for r, c in temp_coords: num_map[r][c] = 0
-                                moves_in_this_pass.append({
-                                    'start': initial_grid[r1][c1]['coords'],
-                                    'end': initial_grid[r2][c2]['coords']
+                            if start_cell != 0 and end_cell != 0:
+                                total_moves.append({
+                                    'start': start_cell['coords'],
+                                    'end': end_cell['coords']
                                 })
-                                found_in_this_pass = True
-            
-            if found_in_this_pass:
-                total_moves.extend(moves_in_this_pass)
-            else:
-                break
+                            elif start_cell != 0:
+                                # 우하단이 0이면 실제 숫자가 있는 마지막 셀 찾기
+                                for er in range(rr, r-1, -1):
+                                    for ec in range(cc, c-1, -1):
+                                        if initial_grid[er][ec] != 0:
+                                            total_moves.append({
+                                                'start': start_cell['coords'],
+                                                'end': initial_grid[er][ec]['coords']
+                                            })
+                                            break
+                                    else:
+                                        continue
+                                    break
+                            
+                            # 영역 지우기
+                            num_map[r:rr+1, c:cc+1] = 0
+                            
+                            found = True
+                            # 보드가 바뀌었으니 처음부터 다시 탐색
+                            r = 0
+                            c = -1
+                            break
+
+                        # 합이 10을 넘으면 더 넓은 영역 볼 필요 없음
+                        if rect_sum > 10:
+                            break
+
+                    if found:
+                        break
+
+                c += 1
+            r += 1
                 
         print(f"📋 예측 완료: 총 {len(total_moves)}회의 드래그 순서 생성!")
         return total_moves
